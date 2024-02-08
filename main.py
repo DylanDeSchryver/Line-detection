@@ -8,11 +8,22 @@ slopes = {}
 while True:
     ret, frame = cap.read()
 
+    # Define the coordinates of the rectangle
+    r_x, r_y, r_width, r_height = 300, 300, 640, 480
+
+    # Draw a rectangle around the ROI
+    cv2.rectangle(frame, (r_x, r_y), (r_x + r_width, r_y + r_height), (255, 0, 0), 2)
+
+    # Crop the frame to the defined ROI
+    roi_frame = frame[r_y:r_y + r_height, r_x:r_x + r_width]
+
     # Convert image to grayscale
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    gray = cv2.cvtColor(roi_frame, cv2.COLOR_BGR2GRAY)
+
+    #blur = cv2.GaussianBlur(gray, (1,1), 0)
 
     # Use canny edge detection
-    edges = cv2.Canny(gray, 50, 150, apertureSize=3)
+    edges = cv2.Canny(gray, 200, 600, apertureSize=3)
 
     # Apply HoughLinesP method to
     # to directly obtain line end points
@@ -24,8 +35,8 @@ while True:
         1,  # Distance resolution in pixels
         np.pi / 180,  # Angle resolution in radians
         threshold=100,  # Min number of votes for valid line
-        minLineLength=5,  # Min allowed length of line
-        maxLineGap=90  # Max allowed gap between line for joining them
+        minLineLength=250,  # Min allowed length of line9
+        maxLineGap=100  # Max allowed gap between line for joining them
 
     )
 
@@ -46,9 +57,9 @@ while True:
                     matching = slopes[x]
                     print('found match')
                     # # Draw the lines to connect points
-                    cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 2) #original line green
+                    cv2.line(roi_frame, (x1, y1), (x2, y2), (0, 255, 0), 9) #original line green
                     print('green')
-                    cv2.line(frame, (matching[0], matching[1]), (matching[2], matching[3]), (255, 0, 0), 2) #new line blue
+                    cv2.line(roi_frame, (matching[0], matching[1]), (matching[2], matching[3]), (255, 0, 0), 9) #new line blue
                     print("blue")
                     midpointx1 = int((x1 + matching[0])/2)
                     midpointy1 = int((y1 + matching[1])/2)
@@ -60,13 +71,19 @@ while True:
 
                     print('hello')
 
-                    cv2.line(frame, (midpointx1, midpointy1), (midpointx2, midpointy2), (255, 0, 255), 1)  # mid line pink
+                    cv2.line(roi_frame, (midpointx1, midpointy1), (midpointx2, midpointy2), (255, 0, 255), 4)  # mid line pink
                     print('pink')
 
 
                     # # Maintain a simples lookup list for points
                     lines_list.append([(x1, y1), (x2, y2)])
                     lines_list.append([(matching[0], matching[1]), (matching[2], matching[3])])
+                    if len(lines_list) >= 8:
+                        print(len(lines_list))
+                        break
+                        
+                    
+               
 
                 # if len(lines_list) >= 5:
                 #     break
@@ -80,5 +97,6 @@ while True:
             # lines_list.append([(x1, y1), (x2, y2)])
 
         # Save the result image
-        cv2.imshow('detectedLines', frame)
-        cv2.waitKey(1)
+        cv2.imshow('detectedLines', roi_frame)
+        #cv2.imshow('dfggdf', edges)
+        cv2.waitKey(15)
