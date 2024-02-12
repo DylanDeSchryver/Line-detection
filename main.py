@@ -1,11 +1,14 @@
 import cv2
 import numpy as np
 
-# Read image
+# Read image from camera
 cap = cv2.VideoCapture(1)
+
 while True:
+    # Capture frame-by-frame
     ret, frame = cap.read()
-    # Define the coordinates of the rectangle
+
+    # Define the coordinates of the region of interest (ROI)
     r_x, r_y, r_width, r_height = 0, 0, 400, 300
 
     # Draw a rectangle around the ROI
@@ -14,31 +17,33 @@ while True:
     # Crop the frame to the defined ROI
     roi_frame = frame[r_y:r_y + r_height, r_x:r_x + r_width]
 
-    # Convert image to grayscale
+    # Convert the cropped image to grayscale
     gray = cv2.cvtColor(roi_frame, cv2.COLOR_BGR2GRAY)
 
-    # Use canny edge detection
-    edges = cv2.Canny(gray, 50, 150, apertureSize=3)
+    # Apply Gaussian blur to reduce noise
+    blurred = cv2.blur(gray, (1, 1))
+
+    # Use Canny edge detection to detect edges
+    edges = cv2.Canny(blurred, 50, 150, apertureSize=3)
 
     # Maintain a list of already displayed lines
     displayed_lines = []
 
-    # Apply HoughLinesP method to
-    # to directly obtain line end points
+    # Apply HoughLinesP method to directly obtain line end points
     lines_list = []
     lines = cv2.HoughLinesP(
-        edges,  # Input edge image
-        1,  # Distance resolution in pixels
-        np.pi / 180,  # Angle resolution in radians
-        threshold=50,  # Min number of votes for valid line
-        minLineLength=5,  # Min allowed length of line
-        maxLineGap=1000  # Max allowed gap between line for joining them
+        edges,              # Input edge image
+        1,                  # Distance resolution in pixels
+        np.pi / 180,        # Angle resolution in radians
+        threshold=75,       # Min number of votes for a valid line
+        minLineLength=200,  # Min allowed length of a line
+        maxLineGap=500      # Max allowed gap between line segments for joining them
     )
 
-    # Iterate over points
+    # Iterate over detected lines
     if lines is not None:
         for line in lines:
-            # Extracted points nested in the list
+            # Extract line endpoints
             x1, y1, x2, y2 = line[0]
 
             # Check if line endpoints are within a certain distance from the edges of the ROI
@@ -57,13 +62,26 @@ while True:
                         too_close = True
                         break
 
-                # If the line is not too close, draw it and add it to the displayed lines list
+                # If the line is not too close to already displayed lines, draw it
                 if not too_close:
-                    cv2.line(roi_frame, (x1, y1), (x2, y2), (0, 255, 0), 5)
+                    if x1 == x2:  # Vertical line
+                        new_x1, new_y1 = x1, r_y
+                        new_x2, new_y2 = x2, r_y + r_height
+                    else:  # Non-vertical line
+                        m = (y2 - y1) / (x2 - x1)
+                        new_x1 = int((r_y - y1 + m * x1) / m) if m != 0 else x1
+                        new_y1 = r_y
+                        new_x2 = int((r_y + r_height - y1 + m * x1) / m) if m != 0 else x1
+                        new_y2 = r_y + r_height
+
+                    # Draw the extended line on the original frame
+                    cv2.line(roi_frame, (new_x1, new_y1), (new_x2, new_y2), (0, 255, 0), 8)
+
+                    # Store the line endpoints and add them to the displayed lines list
                     lines_list.append(((x1, y1), (x2, y2)))
                     displayed_lines.append(((x1, y1), (x2, y2)))
 
-    # Calculate average midpoint of detected lines
+    # Calculate the average midpoint of detected lines
     if len(lines_list) > 0:
         avg_midpoint = np.mean([[(x1 + x2) / 2, (y1 + y2) / 2] for line in lines_list for (x1, y1), (x2, y2) in [line]], axis=0)
         avg_midpoint = avg_midpoint.astype(int)
@@ -75,8 +93,6 @@ while True:
             direction_vector = np.array([x2 - x1, y2 - y1])
             # Calculate the endpoint of the midline based on the direction vector and the average midpoint
             midline_endpoint = avg_midpoint + direction_vector
-            # Draw the midline
-            cv2.line(roi_frame, tuple(avg_midpoint), tuple(midline_endpoint), (255, 255, 0), 2)
 
         # Extend the midline to the edges of the ROI
         if direction_vector[0] != 0:
@@ -88,9 +104,16 @@ while True:
             left_edge_y = int(avg_slope * 0 + b)
             right_edge_y = int(avg_slope * r_width + b)
             # Draw the extended midline
-            cv2.line(roi_frame, (0, left_edge_y), (r_width, right_edge_y), (255, 255, 0), 2)
+            cv2.line(roi_frame, (0, left_edge_y), (r_width, right_edge_y), (255, 255, 0), 5)
 
-    # Save the result image
+    # Display the result images
     cv2.imshow('detectedLines', frame)
     cv2.imshow('edge', edges)
-    cv2.waitKey(1)
+
+    # Wait for 1 millisecond and check for key press
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# Release the video capture object and close all windows
+cap.release()
+cv2.destroyAllWindows()
