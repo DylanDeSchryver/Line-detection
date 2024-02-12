@@ -20,7 +20,7 @@ while True:
     # Convert the cropped image to grayscale
     gray = cv2.cvtColor(roi_frame, cv2.COLOR_BGR2GRAY)
 
-    # Apply Gaussian blur to reduce noise
+    # Apply  blur to reduce noise
     blurred = cv2.blur(gray, (1, 1))
 
     # Use Canny edge detection to detect edges
